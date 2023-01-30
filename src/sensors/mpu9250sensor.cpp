@@ -50,7 +50,8 @@ constexpr float GSCALE = ((32768. / TYPICAL_GYRO_SENSITIVITY) / 32768.) * (PI / 
 constexpr float ASCALE = ((32768. / TYPICAL_ACCEL_SENSITIVITY) / 32768.) * EARTH_GRAVITY;
 #endif
 
-#define MAG_CORR_RATIO 0.002
+float MAG_CORR_RATIO=0.002;
+bool Switch_6DOF = false;
 
 #define ACCEL_SENSITIVITY_2G 16384.0f
 
@@ -58,6 +59,9 @@ constexpr float ASCALE = ((32768. / TYPICAL_ACCEL_SENSITIVITY) / 32768.) * EARTH
 constexpr float ASCALE_2G = ((32768. / ACCEL_SENSITIVITY_2G) / 32768.) * EARTH_GRAVITY;
 
 void MPU9250Sensor::motionSetup() {
+    pinMode(D5,INPUT);
+    pinMode(D6,OUTPUT_OPEN_DRAIN);
+    digitalWrite(D6,HIGH);
     // initialize device
     imu.initialize(addr);
     if(!imu.testConnection()) {
@@ -144,6 +148,8 @@ void MPU9250Sensor::motionSetup() {
     working = true;
     configured = true;
 #endif
+
+
 }
 
 
@@ -158,6 +164,18 @@ void MPU9250Sensor::motionLoop() {
         Network::sendInspectionRawIMUData(sensorId, rX, rY, rZ, 255, aX, aY, aZ, 255, mX, mY, mZ, 255);
     }
 #endif
+
+if(digitalRead(D5))
+{
+    MAG_CORR_RATIO = 0.002;
+    //m_Logger.info("MAG_CORR_RATIO 0.002");
+    //digitalWrite(D6,HIGH);
+} else {
+    MAG_CORR_RATIO = 0;
+    //m_Logger.info("MAG_CORR_RATIO 0");
+    //digitalWrite(D6,LOW);
+}
+
 
 #if not (defined(_MAHONY_H_) || defined(_MADGWICK_H_))
     // Update quaternion
@@ -301,6 +319,7 @@ void MPU9250Sensor::startCalibration(int calibrationType) {
     // with DMP, we just need mag data
     constexpr int calibrationSamples = 300;
 
+    digitalWrite(D6,LOW);
     // Blink calibrating led before user should rotate the sensor
     m_Logger.info("Gently rotate the device while it's gathering magnetometer data");
     ledManager.pattern(15, 300, 3000/310);
@@ -317,7 +336,7 @@ void MPU9250Sensor::startCalibration(int calibrationType) {
         delay(250);
     }
     m_Logger.debug("Calculating calibration data...");
-
+    digitalWrite(D6,HIGH);
     float M_BAinv[4][3];
     CalculateCalibration(calibrationDataMag, calibrationSamples, M_BAinv);
     free(calibrationDataMag);
